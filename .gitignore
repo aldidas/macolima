@@ -5,3 +5,4 @@ Packages/MacolimaKit/.build/
 .swiftpm/
 xcuserdata/
 .superpowers/
+.build/

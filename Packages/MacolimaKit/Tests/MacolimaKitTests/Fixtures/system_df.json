@@ -1,0 +1,34 @@
+{
+ "LayersSize": 64000000,
+ "Images": [],
+ "Containers": [
+  {
+   "Id": "a",
+   "SizeRw": 1000
+  }
+ ],
+ "BuildCache": [
+  {
+   "ID": "bc",
+   "Size": 2000
+  }
+ ],
+ "Volumes": [
+  {
+   "Name": "shop_pgdata",
+   "Driver": "local",
+   "UsageData": {
+    "Size": 123456789,
+    "RefCount": 1
+   }
+  },
+  {
+   "Name": "scratch",
+   "Driver": "local",
+   "UsageData": {
+    "Size": -1,
+    "RefCount": 0
+   }
+  }
+ ]
+}
