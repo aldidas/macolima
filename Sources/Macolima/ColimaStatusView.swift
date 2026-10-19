@@ -15,18 +15,22 @@ struct ColimaStatusView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Circle().fill(running ? Color.green : Color.secondary).frame(width: 8, height: 8)
-                Text(running ? "Colima running" : "Colima stopped").font(.headline)
+                Text(running ? "Colima running" : (model.colimaMissing ? "Colima not found" : "Colima stopped")).font(.headline)
             }
             if case .running(let info) = model.colima {
                 Text("\(info.cpus) CPU · \(Bytes.string(info.memoryBytes)) RAM")
                     .font(.caption).foregroundStyle(.secondary)
             }
             diskLines
-            Button(running ? "Stop Colima" : "Start Colima") {
-                Task { running ? await model.stopColima() : await model.startColima() }
+            if model.colimaMissing {
+                Text("Not installed: brew install colima").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Button(running ? "Stop Colima" : "Start Colima") {
+                    Task { running ? await model.stopColima() : await model.startColima() }
+                }
+                .controlSize(.small)
+                .disabled(model.colimaBusy)
             }
-            .controlSize(.small)
-            .disabled(model.colimaBusy)
             if model.colimaBusy { ProgressView().controlSize(.small) }
             if let error = model.lastError {
                 Text(error).font(.caption).foregroundStyle(.red).lineLimit(3)

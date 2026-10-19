@@ -11,7 +11,7 @@ struct StaleBanner: View {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
                 Text(text).font(.callout)
                 Spacer()
-                if case .colimaStopped = model.connection {
+                if case .colimaStopped = model.connection, !model.colimaMissing {
                     Button("Start Colima") { Task { await model.startColima() } }
                         .buttonStyle(.borderedProminent)
                         .disabled(model.colimaBusy)
@@ -27,15 +27,18 @@ struct StaleBanner: View {
     }
 
     private var text: String? {
+        if model.colimaMissing, model.connection != .live {
+            return "Colima is not installed. Install it with “brew install colima”, then press Retry."
+        }
         switch model.connection {
         case .live:
-            nil
+            return nil
         case .colimaStopped(let last):
-            "Colima is stopped. " + Self.asOf(last, fallback: "No saved data yet.")
+            return "Colima is stopped. " + Self.asOf(last, fallback: "No saved data yet.")
         case .stale(let date):
-            "Docker is not responding. " + Self.asOf(date == .distantPast ? nil : date, fallback: "No saved data yet.")
+            return "Docker is not responding. " + Self.asOf(date == .distantPast ? nil : date, fallback: "No saved data yet.")
         case .unreachable(let message):
-            message
+            return message
         }
     }
 

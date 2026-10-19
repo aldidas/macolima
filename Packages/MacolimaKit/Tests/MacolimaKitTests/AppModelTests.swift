@@ -198,4 +198,20 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.connection, .live)
         XCTAssertEqual(model.containers.map(\.name), ["web"])
     }
+
+    func test_bootstrap_colimaNotInstalled_isFlagged() async {
+        let model = AppModel(locate: { SocketInfo(path: "/tmp/fake.sock", profile: "default") },
+                             engineFactory: { _ in FakeEngine() },
+                             colimaFactory: { FakeColimaShell(running: false).service(profile: $0) },
+                             store: makeStore(), colimaInstalled: { false }, pollInterval: nil)
+        await model.bootstrap()
+        XCTAssertTrue(model.colimaMissing)
+        XCTAssertEqual(model.connection, .colimaStopped(lastSnapshot: nil))
+    }
+
+    func test_bootstrap_colimaInstalled_isNotFlagged() async {
+        let model = makeModel(engine: FakeEngine(), shell: FakeColimaShell(running: false), store: makeStore())
+        await model.bootstrap()
+        XCTAssertFalse(model.colimaMissing)
+    }
 }

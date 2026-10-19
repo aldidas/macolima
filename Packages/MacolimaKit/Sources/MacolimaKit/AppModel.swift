@@ -26,6 +26,8 @@ public final class AppModel {
     public private(set) var socket: SocketInfo?
     public private(set) var isBootstrapped = false
     public private(set) var colimaBusy = false
+    /// The `colima` executable cannot be found: starting it is impossible, installing it is the next step.
+    public private(set) var colimaMissing = false
     public var lastError: String?
 
     public var usage: UsageIndex { UsageIndex(containers: containers) }
@@ -35,6 +37,7 @@ public final class AppModel {
     @ObservationIgnored private let engineFactory: (String) -> DockerEngine
     @ObservationIgnored private let colimaFactory: (String) -> ColimaService
     @ObservationIgnored private let store: SnapshotStore
+    @ObservationIgnored private let colimaInstalled: () -> Bool
     @ObservationIgnored private let debounce: Duration
     @ObservationIgnored private let pollInterval: Duration?
 
@@ -51,12 +54,14 @@ public final class AppModel {
                 engineFactory: @escaping (String) -> DockerEngine = { DockerAPI(socketPath: $0) },
                 colimaFactory: @escaping (String) -> ColimaService = { ColimaService(profile: $0) },
                 store: SnapshotStore,
+                colimaInstalled: @escaping () -> Bool = { Shell.find("colima") != nil },
                 debounce: Duration = .milliseconds(300),
                 pollInterval: Duration? = .seconds(5)) {
         self.locate = locate
         self.engineFactory = engineFactory
         self.colimaFactory = colimaFactory
         self.store = store
+        self.colimaInstalled = colimaInstalled
         self.debounce = debounce
         self.pollInterval = pollInterval
     }
@@ -108,6 +113,7 @@ public final class AppModel {
 
     private func connectOnce() async {
         guard let engine, let colimaService else { return }
+        colimaMissing = !colimaInstalled()
         let status = await colimaService.status()
         colima = status
         guard case .running(let info) = status else {
