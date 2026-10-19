@@ -14,8 +14,7 @@ struct PruneSheet: View {
 
     let title: String
     let entries: [PruneEntry]
-    let knownBytes: Int64
-    let unknownSizeCount: Int
+    let summary: String
     var warning: String?
     var confirmLabel = "Remove"
     let run: () async -> [Result]
@@ -71,12 +70,6 @@ struct PruneSheet: View {
         }
     }
 
-    private var summary: String {
-        var text = "\(entries.count) item\(entries.count == 1 ? "" : "s") · frees \(Bytes.string(knownBytes))"
-        if unknownSizeCount > 0 { text += " + \(unknownSizeCount) item\(unknownSizeCount == 1 ? "" : "s") of unknown size" }
-        return text + " inside the VM"
-    }
-
     private func done(_ results: [Result]) -> some View {
         let failures = results.filter { $0.error != nil }
         return VStack(alignment: .leading, spacing: 12) {
@@ -103,8 +96,7 @@ struct PruneRequest: Identifiable {
     let id = UUID()
     let title: String
     let entries: [PruneEntry]
-    let knownBytes: Int64
-    let unknownSizeCount: Int
+    let summary: String
     var warning: String?
     var confirmLabel = "Remove"
     let run: () async -> [PruneSheet.Result]
@@ -113,7 +105,7 @@ struct PruneRequest: Identifiable {
 extension View {
     func pruneSheet(_ request: Binding<PruneRequest?>) -> some View {
         sheet(item: request) { r in
-            PruneSheet(title: r.title, entries: r.entries, knownBytes: r.knownBytes, unknownSizeCount: r.unknownSizeCount,
+            PruneSheet(title: r.title, entries: r.entries, summary: r.summary,
                        warning: r.warning, confirmLabel: r.confirmLabel, run: r.run)
         }
     }

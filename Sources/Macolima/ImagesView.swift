@@ -77,7 +77,8 @@ struct ImagesView: View {
         request = PruneRequest(
             title: "Delete \(deletable.count) image\(deletable.count == 1 ? "" : "s")?",
             entries: entries(deletable),
-            knownBytes: deletable.reduce(0) { $0 + $1.size }, unknownSizeCount: 0,
+            summary: PruneSummary.text(count: deletable.count, knownBytes: deletable.reduce(0) { $0 + $1.size },
+                                       unknownSizeCount: 0, sizesAreShared: true),
             warning: skipped > 0 ? "\(skipped) selected image(s) are used by a container and will be skipped." : nil,
             confirmLabel: "Delete",
             run: { results(await model.deleteImages(deletable)) })
@@ -87,7 +88,7 @@ struct ImagesView: View {
         let plan = model.unusedImagesPlan
         request = PruneRequest(
             title: "Remove all unused images?",
-            entries: entries(plan.items), knownBytes: plan.knownBytes, unknownSizeCount: plan.unknownSizeCount,
+            entries: entries(plan.items), summary: plan.summary(sizesAreShared: true),
             warning: nil,
             run: { results(await model.pruneUnused(plan)) })
     }

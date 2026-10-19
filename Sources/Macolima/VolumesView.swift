@@ -66,7 +66,8 @@ struct VolumesView: View {
         request = PruneRequest(
             title: "Delete \(volumes.count) volume\(volumes.count == 1 ? "" : "s")?",
             entries: volumes.map(entry),
-            knownBytes: known, unknownSizeCount: volumes.filter { $0.size == nil }.count,
+            summary: PruneSummary.text(count: volumes.count, knownBytes: known,
+                                       unknownSizeCount: volumes.filter { $0.size == nil }.count, sizesAreShared: false),
             warning: "The data in " + (volumes.count == 1 ? "this volume" : "these volumes") + " is deleted permanently."
                 + (inUse.isEmpty ? "" : " \(inUse.count) still referenced by a container; Docker will refuse those."),
             confirmLabel: "Delete",
@@ -77,7 +78,7 @@ struct VolumesView: View {
         let plan = model.unusedVolumesPlan
         request = PruneRequest(
             title: "Remove all unused volumes?",
-            entries: plan.items.map(entry), knownBytes: plan.knownBytes, unknownSizeCount: plan.unknownSizeCount,
+            entries: plan.items.map(entry), summary: plan.summary(),
             warning: "Volumes hold data (databases, uploads). Removing them deletes that data permanently, and it cannot be undone.",
             run: { results(await model.pruneUnused(plan)) })
     }

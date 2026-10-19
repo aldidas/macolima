@@ -74,3 +74,22 @@ public enum Pruner {
         }
     }
 }
+
+public enum PruneSummary {
+    /// One line under the preview list. Image sizes include layers shared with other images, so a summed image
+    /// total is an upper bound ("up to"); unknown sizes are listed apart and never counted as 0 bytes.
+    public static func text(count: Int, knownBytes: Int64, unknownSizeCount: Int, sizesAreShared: Bool) -> String {
+        let size = ByteCountFormatter.string(fromByteCount: knownBytes, countStyle: .file)
+        var text = "\(count) item\(count == 1 ? "" : "s") · frees " + (sizesAreShared ? "up to " : "") + size
+        if unknownSizeCount > 0 { text += " + \(unknownSizeCount) item\(unknownSizeCount == 1 ? "" : "s") of unknown size" }
+        text += " inside the VM"
+        if sizesAreShared { text += " (layers shared between images are counted once per image)" }
+        return text
+    }
+}
+
+extension PrunePlan {
+    public func summary(sizesAreShared: Bool = false) -> String {
+        PruneSummary.text(count: items.count, knownBytes: knownBytes, unknownSizeCount: unknownSizeCount, sizesAreShared: sizesAreShared)
+    }
+}

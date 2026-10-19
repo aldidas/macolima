@@ -37,3 +37,29 @@ private actor Recorder {
     var items: [String] = []
     func add(_ s: String) { items.append(s) }
 }
+
+/// Review finding: image sizes include layers shared with other images, so a summed total can overstate what is freed.
+final class PruneSummaryTests: XCTestCase {
+    private func bytes(_ n: Int64) -> String { ByteCountFormatter.string(fromByteCount: n, countStyle: .file) }
+
+    func test_exactTotal_saysFrees() {
+        XCTAssertEqual(PruneSummary.text(count: 2, knownBytes: 3_000_000, unknownSizeCount: 0, sizesAreShared: false),
+                       "2 items · frees \(bytes(3_000_000)) inside the VM")
+    }
+
+    func test_sharedLayerSizes_sayUpTo_andExplain() {
+        let text = PruneSummary.text(count: 5, knownBytes: 5_000_000_000, unknownSizeCount: 0, sizesAreShared: true)
+        XCTAssertTrue(text.contains("frees up to \(bytes(5_000_000_000))"), text)
+        XCTAssertTrue(text.contains("shared"), text)
+    }
+
+    func test_unknownSizes_areListedSeparately_neverAsZero() {
+        XCTAssertEqual(PruneSummary.text(count: 1, knownBytes: 0, unknownSizeCount: 1, sizesAreShared: false),
+                       "1 item · frees \(bytes(0)) + 1 item of unknown size inside the VM")
+    }
+
+    func test_planConvenience_matchesFreeFunction() {
+        let plan = PrunePlan(items: ["a", "b"], knownBytes: 10, unknownSizeCount: 2)
+        XCTAssertEqual(plan.summary(sizesAreShared: true), PruneSummary.text(count: 2, knownBytes: 10, unknownSizeCount: 2, sizesAreShared: true))
+    }
+}
