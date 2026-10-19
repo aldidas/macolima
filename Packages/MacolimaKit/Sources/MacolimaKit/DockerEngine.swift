@@ -183,9 +183,25 @@ public final class DockerAPI: DockerEngine, @unchecked Sendable {
 
     // MARK: Streams
 
-    /// Wired to `LogDecoder` together with its tests (logs step).
     public func logs(containerID: String, tail: Int, tty: Bool) -> AsyncThrowingStream<LogLine, Error> {
-        AsyncThrowingStream { $0.finish() }
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let request = HTTPRequest(
+                        method: "GET", path: try await self.versioned("/containers/\(containerID)/logs"),
+                        query: ["stdout": "1", "stderr": "1", "follow": "1", "tail": String(tail), "timestamps": "0"])
+                    var decoder = LogDecoder(tty: tty)
+                    for try await chunk in self.transport.stream(request) {
+                        for line in decoder.feed(chunk) { continuation.yield(line) }
+                    }
+                    for line in decoder.finish() { continuation.yield(line) }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 
     public func events() -> AsyncThrowingStream<DockerEvent, Error> {
