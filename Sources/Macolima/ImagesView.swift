@@ -64,7 +64,7 @@ struct ImagesView: View {
     }
 
     private func entries(_ images: [ImageSummary]) -> [PruneEntry] {
-        images.map { PruneEntry(id: $0.id, label: ImageFormat.name($0) + ($0.tags.isEmpty ? " (\(ImageFormat.shortID($0)))" : ""), detail: Bytes.string($0.size)) }
+        images.map { PruneEntry(id: $0.id, label: $0.tags.isEmpty ? "<none> (\(ImageFormat.shortID($0)))" : $0.tags.joined(separator: ", "), detail: Bytes.string($0.size)) }
     }
 
     private func results(_ outcomes: [PruneOutcome<ImageSummary>]) -> [PruneSheet.Result] {

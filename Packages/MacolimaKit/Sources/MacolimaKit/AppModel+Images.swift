@@ -19,11 +19,21 @@ extension AppModel {
             }
         }
         let removable = PrunePlan(items: images.filter { blocked[$0.id] == nil }, knownBytes: 0, unknownSizeCount: 0)
-        let ran = await Pruner.run(removable) { try await engine.removeImage($0.id) }
+        let ran = await Pruner.run(removable) { try await Self.remove($0, using: engine) }
         await refreshAfterMutation()
         let results = Dictionary(ran.map { ($0.item.id, $0) }, uniquingKeysWith: { first, _ in first })
         return images.map { image in
             results[image.id] ?? PruneOutcome(item: image, error: blocked[image.id])
+        }
+    }
+
+    /// dockerd refuses `DELETE /images/<id>` without force when the image carries several tags, so such an image
+    /// is untagged tag by tag (the image goes with its last tag). Single-tag and dangling images go by ID.
+    private static func remove(_ image: ImageSummary, using engine: DockerEngine) async throws {
+        if image.tags.count > 1 {
+            for tag in image.tags { try await engine.removeImage(tag) }
+        } else {
+            try await engine.removeImage(image.id)
         }
     }
 

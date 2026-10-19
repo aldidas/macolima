@@ -57,9 +57,24 @@ final class FakeEngine: DockerEngine, @unchecked Sendable {
         try record("removeContainer:\(id)")
         lock.withLock { _containers.removeAll { $0.id == id } }
     }
-    func removeImage(_ id: String) async throws {
-        try record("removeImage:\(id)")
-        lock.withLock { _images.removeAll { $0.id == id } }
+    /// Mirrors dockerd without `force`: by ID an image with several tags is refused; by tag it is untagged and
+    /// the image goes with its last tag.
+    func removeImage(_ ref: String) async throws {
+        try record("removeImage:\(ref)")
+        try lock.withLock {
+            if let i = _images.firstIndex(where: { $0.id == ref }) {
+                if _images[i].tags.count > 1 {
+                    throw DockerError.http(status: 409, message: "conflict: unable to delete \(ref) (must be forced) - image is referenced in multiple repositories")
+                }
+                _images.remove(at: i)
+            } else if let i = _images.firstIndex(where: { $0.tags.contains(ref) }) {
+                let img = _images[i]
+                let rest = img.tags.filter { $0 != ref }
+                if rest.isEmpty { _images.remove(at: i) } else { _images[i] = ImageSummary(id: img.id, tags: rest, size: img.size, created: img.created) }
+            } else {
+                throw DockerError.http(status: 404, message: "No such image: \(ref)")
+            }
+        }
     }
     func removeVolume(_ name: String) async throws {
         try record("removeVolume:\(name)")
