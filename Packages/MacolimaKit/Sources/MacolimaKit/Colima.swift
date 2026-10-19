@@ -6,6 +6,15 @@ public enum ShellError: Error, Equatable {
     case failed(exe: String, code: Int32, stderr: String)
 }
 
+extension ShellError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .notFound(let exe): return "\(exe) was not found. Is it installed?"
+        case .failed(let exe, let code, let stderr): return stderr.isEmpty ? "\(exe) exited with code \(code)" : stderr
+        }
+    }
+}
+
 public enum Shell {
     /// GUI apps start with a minimal PATH: add Homebrew's and whatever the login shell would see.
     static let searchPath: [String] = {

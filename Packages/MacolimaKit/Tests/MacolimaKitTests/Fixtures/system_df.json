@@ -1,8 +1,18 @@
 {
  "LayersSize": 64000000,
  "Images": [],
- "Containers": [],
- "BuildCache": [],
+ "Containers": [
+  {
+   "Id": "a",
+   "SizeRw": 1000
+  }
+ ],
+ "BuildCache": [
+  {
+   "ID": "bc",
+   "Size": 2000
+  }
+ ],
  "Volumes": [
   {
    "Name": "shop_pgdata",

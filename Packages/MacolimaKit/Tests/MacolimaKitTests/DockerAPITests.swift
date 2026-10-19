@@ -140,4 +140,18 @@ final class DockerAPITests: XCTestCase {
             .image(id: "sha256:ff", action: "delete"),
         ])
     }
+
+    func test_diskUsage_sumsLayersVolumesBuildCacheAndWritableLayers() async throws {
+        // 64_000_000 layers + 123_456_789 volume (the -1 volume is ignored) + 2_000 build cache + 1_000 container
+        let bytes = try await DockerAPI(transport: FakeTransport.standard()).diskUsage()
+        XCTAssertEqual(bytes, 64_000_000 + 123_456_789 + 2_000 + 1_000)
+    }
+
+    func test_diskUsage_sharesTheCachedSystemDF() async throws {
+        let t = FakeTransport.standard()
+        let api = DockerAPI(transport: t)
+        _ = try await api.volumes()
+        _ = try await api.diskUsage()
+        XCTAssertEqual(t.requests.filter { $0.path.hasSuffix("/system/df") }.count, 1)
+    }
 }

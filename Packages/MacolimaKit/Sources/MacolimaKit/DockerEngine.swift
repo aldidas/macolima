@@ -23,6 +23,8 @@ public protocol DockerEngine: Sendable {
     /// Never forces.
     func removeVolume(_ name: String) async throws
     func isTTY(containerID: String) async throws -> Bool
+    /// Bytes Docker uses inside the VM: image layers, volumes, build cache and container writable layers.
+    func diskUsage() async throws -> Int64
     func logs(containerID: String, tail: Int, tty: Bool) -> AsyncThrowingStream<LogLine, Error>
     func events() -> AsyncThrowingStream<DockerEvent, Error>
 }
@@ -34,7 +36,9 @@ public final class DockerAPI: DockerEngine, @unchecked Sendable {
     private let now: @Sendable () -> Date
     private let lock = NSLock()
     private var apiVersion: String?
-    private var dfCache: (at: Date, sizes: [String: Int64])?
+    private var dfCache: (at: Date, info: DFInfo)?
+
+    private struct DFInfo { let volumeSizes: [String: Int64]; let totalBytes: Int64 }
 
     public convenience init(socketPath: String) {
         self.init(transport: UnixHTTPClient(socketPath: socketPath))
@@ -132,22 +136,35 @@ public final class DockerAPI: DockerEngine, @unchecked Sendable {
         }
     }
 
-    /// Known volume sizes from `/system/df` (-1 = not computed, left out). Cached briefly so a burst
-    /// of events does not hammer the slow endpoint.
-    private func volumeSizes() async throws -> [String: Int64] {
-        let fresh = lock.withLock { dfCache.flatMap { now().timeIntervalSince($0.at) < Self.dfTTL ? $0.sizes : nil } }
+    private func volumeSizes() async throws -> [String: Int64] { try await systemDF().volumeSizes }
+
+    public func diskUsage() async throws -> Int64 { try await systemDF().totalBytes }
+
+    /// `/system/df`, cached briefly so a burst of events does not hammer the slow endpoint.
+    /// Volume sizes of -1 (not computed) are left out.
+    private func systemDF() async throws -> DFInfo {
+        let fresh = lock.withLock { dfCache.flatMap { now().timeIntervalSince($0.at) < Self.dfTTL ? $0.info : nil } }
         if let fresh { return fresh }
         struct DF: Decodable {
             struct V: Decodable { struct U: Decodable { let Size: Int64 }; let Name: String; let UsageData: U? }
+            struct C: Decodable { let SizeRw: Int64? }
+            struct B: Decodable { let Size: Int64? }
+            let LayersSize: Int64?
             let Volumes: [V]?
+            let Containers: [C]?
+            let BuildCache: [B]?
         }
         let df = try await get(DF.self, "/system/df")
         var sizes: [String: Int64] = [:]
         for v in df.Volumes ?? [] {
             if let s = v.UsageData?.Size, s >= 0 { sizes[v.Name] = s }
         }
-        lock.withLock { dfCache = (now(), sizes) }
-        return sizes
+        let total = (df.LayersSize ?? 0) + sizes.values.reduce(0, +)
+            + (df.Containers ?? []).reduce(0) { $0 + max(0, $1.SizeRw ?? 0) }
+            + (df.BuildCache ?? []).reduce(0) { $0 + max(0, $1.Size ?? 0) }
+        let info = DFInfo(volumeSizes: sizes, totalBytes: total)
+        lock.withLock { dfCache = (now(), info) }
+        return info
     }
 
     private static func parseDate(_ s: String) -> Date? {
