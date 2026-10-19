@@ -151,14 +151,22 @@ struct ContainerDetailView: View {
     private func actions(_ c: ContainerSummary) -> some View {
         let isRunning = [.running, .paused, .restarting].contains(c.state)
         return HStack {
-            Button("Start") { run(.start, c) }.disabled(isRunning)
-            Button("Stop") { run(.stop, c) }.disabled(!isRunning)
-            Button("Restart") { run(.restart, c) }.disabled(!isRunning)
-            Button("Logs") { showLogs = true }
+            iconButton("Start", "play.fill") { run(.start, c) }.disabled(isRunning)
+            iconButton("Stop", "stop.fill") { run(.stop, c) }.disabled(!isRunning)
+            iconButton("Restart", "arrow.clockwise") { run(.restart, c) }.disabled(!isRunning)
+            iconButton("Logs", "text.alignleft") { showLogs = true }
             Spacer()
-            Button("Delete…", role: .destructive) { confirmDelete = true }
+            iconButton("Delete…", "trash", role: .destructive) { confirmDelete = true }
         }
         .disabled(!model.canMutate)
+    }
+
+    /// Icon-only button; the title stays as the accessibility label and the tooltip.
+    private func iconButton(_ title: String, _ symbol: String, role: ButtonRole? = nil, action: @escaping () -> Void) -> some View {
+        Button(role: role, action: action) {
+            Label(title, systemImage: symbol).labelStyle(.iconOnly)
+        }
+        .help(title)
     }
 
     private func run(_ action: ContainerAction, _ c: ContainerSummary) {
