@@ -257,6 +257,9 @@ public final class DockerAPI: DockerEngine, @unchecked Sendable {
         }
         guard !line.isEmpty, let raw = try? JSONDecoder().decode(Raw.self, from: line) else { return nil }
         let id = raw.Actor?.ID ?? "", action = raw.Action ?? ""
+        // Healthchecks and exec sessions emit these every few seconds; they never change what the lists show.
+        let chatty = ["exec_", "health_status", "attach", "detach", "resize", "top"]
+        if chatty.contains(where: { action.hasPrefix($0) }) { return .other }
         switch raw.Type {
         case "container": return .container(id: id, action: action)
         case "image": return .image(id: id, action: action)

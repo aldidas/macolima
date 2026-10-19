@@ -165,4 +165,15 @@ final class DockerAPITests: XCTestCase {
         _ = try await api.containers()
         XCTAssertNil(t.requests.last?.timeout, "plain reads use the transport default")
     }
+
+    /// Review finding: healthchecks emit exec_* / health_status every few seconds; they must not look like state changes.
+    func test_events_chattyNonStateEventsAreOther() async throws {
+        let t = FakeTransport.standard()
+        func line(_ action: String) -> String { #"{"Type":"container","Action":"\#(action)","Actor":{"ID":"abc"}}"# + "\n" }
+        t.streamChunks = [Data((["exec_create: sh -c true", "exec_start: sh -c true", "exec_die", "health_status: healthy",
+                                  "attach", "resize", "top", "start"].map(line)).joined().utf8)]
+        var events: [DockerEvent] = []
+        for try await e in DockerAPI(transport: t).events() { events.append(e) }
+        XCTAssertEqual(events, Array(repeating: DockerEvent.other, count: 7) + [.container(id: "abc", action: "start")])
+    }
 }
