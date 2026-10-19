@@ -23,6 +23,7 @@ struct RootView: View {
     @State private var section: SidebarItem? = .containers
     @State private var containerID: String?
     @State private var imageIDs: Set<String> = []
+    @State private var volumeNames: Set<String> = []
 
     var body: some View {
         NavigationSplitView {
@@ -47,7 +48,7 @@ struct RootView: View {
             switch section ?? .containers {
             case .containers: ContainersView(selection: $containerID)
             case .images: ImagesView(selection: $imageIDs)
-            case .volumes: ContentUnavailableView("Volumes", systemImage: SidebarItem.volumes.symbol)
+            case .volumes: VolumesView(selection: $volumeNames)
             }
         }
     }
@@ -56,7 +57,7 @@ struct RootView: View {
         switch section ?? .containers {
         case .containers: ContainerDetailView(containerID: containerID)
         case .images: ImageDetailView(selection: imageIDs)
-        case .volumes: Color.clear
+        case .volumes: VolumeDetailView(selection: volumeNames)
         }
     }
 }
