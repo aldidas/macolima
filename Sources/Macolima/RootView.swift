@@ -22,6 +22,7 @@ struct RootView: View {
     @Environment(AppModel.self) private var model
     @State private var section: SidebarItem? = .containers
     @State private var containerID: String?
+    @State private var imageIDs: Set<String> = []
 
     var body: some View {
         NavigationSplitView {
@@ -45,7 +46,7 @@ struct RootView: View {
         } else {
             switch section ?? .containers {
             case .containers: ContainersView(selection: $containerID)
-            case .images: ContentUnavailableView("Images", systemImage: SidebarItem.images.symbol)
+            case .images: ImagesView(selection: $imageIDs)
             case .volumes: ContentUnavailableView("Volumes", systemImage: SidebarItem.volumes.symbol)
             }
         }
@@ -54,7 +55,8 @@ struct RootView: View {
     @ViewBuilder private var detail: some View {
         switch section ?? .containers {
         case .containers: ContainerDetailView(containerID: containerID)
-        case .images, .volumes: Color.clear
+        case .images: ImageDetailView(selection: imageIDs)
+        case .volumes: Color.clear
         }
     }
 }
