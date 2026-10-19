@@ -1,0 +1,7 @@
+.DS_Store
+build/
+Macolima.xcodeproj/
+Packages/MacolimaKit/.build/
+.swiftpm/
+xcuserdata/
+.superpowers/
