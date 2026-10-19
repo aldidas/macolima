@@ -37,7 +37,7 @@ final class ImageActionsTests: XCTestCase {
     func test_pruneUnusedImages_removesOnlyUnused() async {
         let e = engine()
         let model = await makeLiveModel(e)
-        let outcomes = await model.pruneUnusedImages()
+        let outcomes = await model.pruneUnused(model.unusedImagesPlan)
         XCTAssertEqual(Set(outcomes.map(\.item.id)), ["sha256:free1", "sha256:free2"])
         XCTAssertTrue(outcomes.allSatisfy { $0.error == nil })
         XCTAssertEqual(Set(model.images.map(\.id)), ["sha256:used", "sha256:dangling"])
@@ -47,7 +47,7 @@ final class ImageActionsTests: XCTestCase {
         let e = engine()
         e.fail("removeImage:sha256:free1", with: DockerError.http(status: 409, message: "image is being used by a container"))
         let model = await makeLiveModel(e)
-        let outcomes = await model.pruneUnusedImages()
+        let outcomes = await model.pruneUnused(model.unusedImagesPlan)
         XCTAssertEqual(outcomes.count, 2)
         XCTAssertEqual(outcomes.first { $0.item.id == "sha256:free1" }?.error, "image is being used by a container")
         XCTAssertNil(outcomes.first { $0.item.id == "sha256:free2" }?.error)
@@ -65,10 +65,24 @@ final class ImageActionsTests: XCTestCase {
     func test_imageActions_whenNotLive_doNothing() async {
         let e = engine()
         let model = await makeLiveModel(e, running: false)
-        let outcomes = await model.pruneUnusedImages()
+        let outcomes = await model.pruneUnused(model.unusedImagesPlan)
         XCTAssertTrue(outcomes.isEmpty || outcomes.allSatisfy { $0.error != nil })
         let del = await model.deleteImages([image("sha256:free1")])
         XCTAssertNotNil(del.first?.error)
         XCTAssertTrue(e.calls.isEmpty)
+    }
+
+    func test_pruneUnusedImages_removesOnlyThePreviewedPlan_evenIfStateChangedMeanwhile() async {
+        let e = engine()
+        let model = await makeLiveModel(e)
+        let previewed = model.unusedImagesPlan                        // [free1, free2]; used + dangling are held
+        let db = model.containers.first { $0.name == "db" }!
+        _ = await model.perform(.delete, on: db)                      // "used" is now unreferenced but was never shown
+        XCTAssertTrue(model.usage.isUnused(model.images.first { $0.id == "sha256:used" }!))
+
+        let outcomes = await model.pruneUnused(previewed)
+
+        XCTAssertEqual(Set(outcomes.map(\.item.id)), ["sha256:free1", "sha256:free2"])
+        XCTAssertFalse(e.calls.contains("removeImage:sha256:used"))
     }
 }

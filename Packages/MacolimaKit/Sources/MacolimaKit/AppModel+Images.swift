@@ -27,10 +27,9 @@ extension AppModel {
         }
     }
 
-    public func pruneUnusedImages() async -> [PruneOutcome<ImageSummary>] {
-        guard canMutate, let engine else { return [] }
-        let outcomes = await Pruner.run(unusedImagesPlan) { try await engine.removeImage($0.id) }
-        await refreshAfterMutation()
-        return outcomes
+    /// Removes exactly the previewed plan. It never recomputes "unused" at confirm time: what the user was shown
+    /// is what goes (images that gained a container since are skipped with an error, not removed).
+    public func pruneUnused(_ plan: PrunePlan<ImageSummary>) async -> [PruneOutcome<ImageSummary>] {
+        await deleteImages(plan.items)
     }
 }

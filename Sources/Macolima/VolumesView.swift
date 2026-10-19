@@ -79,7 +79,7 @@ struct VolumesView: View {
             title: "Remove all unused volumes?",
             entries: plan.items.map(entry), knownBytes: plan.knownBytes, unknownSizeCount: plan.unknownSizeCount,
             warning: "Volumes hold data (databases, uploads). Removing them deletes that data permanently, and it cannot be undone.",
-            run: { results(await model.pruneUnusedVolumes()) })
+            run: { results(await model.pruneUnused(plan)) })
     }
 }
 

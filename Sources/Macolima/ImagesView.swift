@@ -89,7 +89,7 @@ struct ImagesView: View {
             title: "Remove all unused images?",
             entries: entries(plan.items), knownBytes: plan.knownBytes, unknownSizeCount: plan.unknownSizeCount,
             warning: nil,
-            run: { results(await model.pruneUnusedImages()) })
+            run: { results(await model.pruneUnused(plan)) })
     }
 }
 

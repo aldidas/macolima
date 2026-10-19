@@ -12,7 +12,7 @@ final class VolumeActionsTests: XCTestCase {
     func test_pruneUnusedVolumes_keepsVolumeUsedByStoppedContainer() async {
         let e = engine()
         let model = await makeLiveModel(e)
-        let outcomes = await model.pruneUnusedVolumes()
+        let outcomes = await model.pruneUnused(model.unusedVolumesPlan)
         XCTAssertEqual(Set(outcomes.map(\.item.name)), ["cache", "mystery"])
         XCTAssertTrue(outcomes.allSatisfy { $0.error == nil })
         XCTAssertEqual(model.volumes.map(\.name), ["pgdata"])
@@ -23,7 +23,7 @@ final class VolumeActionsTests: XCTestCase {
         let e = engine()
         e.fail("removeVolume:cache", with: DockerError.http(status: 404, message: "no such volume"))
         let model = await makeLiveModel(e)
-        let outcomes = await model.pruneUnusedVolumes()
+        let outcomes = await model.pruneUnused(model.unusedVolumesPlan)
         XCTAssertEqual(outcomes.first { $0.item.name == "cache" }?.error, "no such volume")
         XCTAssertNil(outcomes.first { $0.item.name == "mystery" }?.error)
     }
@@ -62,8 +62,24 @@ final class VolumeActionsTests: XCTestCase {
         let model = await makeLiveModel(e, running: false)
         let del = await model.deleteVolumes([volume("cache")])
         XCTAssertNotNil(del.first?.error)
-        let pruned = await model.pruneUnusedVolumes()
+        let pruned = await model.pruneUnused(model.unusedVolumesPlan)
         XCTAssertTrue(pruned.isEmpty)
         XCTAssertTrue(e.calls.isEmpty)
+    }
+
+    /// Review finding: prune must remove what the user was SHOWN, not a list recomputed at confirm time.
+    func test_pruneUnusedVolumes_removesOnlyThePreviewedPlan_evenIfStateChangedMeanwhile() async {
+        let e = engine()
+        let model = await makeLiveModel(e)
+        let previewed = model.unusedVolumesPlan                       // [cache, mystery]; pgdata is held by "db"
+        let db = model.containers.first { $0.name == "db" }!
+        _ = await model.perform(.delete, on: db)                      // e.g. `docker compose down` while the sheet is open
+        XCTAssertTrue(model.usage.isUnused(model.volumes.first { $0.name == "pgdata" }!), "pgdata is now unused, but was never shown")
+
+        let outcomes = await model.pruneUnused(previewed)
+
+        XCTAssertEqual(Set(outcomes.map(\.item.name)), ["cache", "mystery"])
+        XCTAssertFalse(e.calls.contains("removeVolume:pgdata"))
+        XCTAssertTrue(model.volumes.contains { $0.name == "pgdata" })
     }
 }

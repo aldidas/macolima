@@ -24,10 +24,9 @@ extension AppModel {
         return outcomes
     }
 
-    public func pruneUnusedVolumes() async -> [PruneOutcome<VolumeSummary>] {
-        guard canMutate, let engine else { return [] }
-        let outcomes = await Pruner.run(unusedVolumesPlan) { try await engine.removeVolume($0.name) }
-        await refreshAfterMutation()
-        return outcomes
+    /// Removes exactly the previewed plan. It never recomputes "unused" at confirm time: volumes hold data, so what
+    /// the user was shown is all that may go.
+    public func pruneUnused(_ plan: PrunePlan<VolumeSummary>) async -> [PruneOutcome<VolumeSummary>] {
+        await deleteVolumes(plan.items)
     }
 }
