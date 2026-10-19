@@ -62,7 +62,8 @@ public enum Pruner {
         return outcomes
     }
 
-    static func describe(_ error: Error) -> String {
+    /// Human-readable text for an error from the engine, Colima or the shell.
+    public static func describe(_ error: Error) -> String {
         switch error as? DockerError {
         case .http(_, let message): return message
         case .socketMissing: return "Docker socket not found"

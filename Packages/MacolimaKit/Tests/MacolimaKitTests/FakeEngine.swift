@@ -13,6 +13,8 @@ final class FakeEngine: DockerEngine, @unchecked Sendable {
 
     var negotiateError: Error?
     var diskBytes: Int64 = 0
+    var ttyContainerIDs: Set<String> = []
+    var logLines: [LogLine] = []
 
     init(containers: [ContainerSummary] = [], images: [ImageSummary] = [], volumes: [VolumeSummary] = []) {
         _containers = containers
@@ -63,8 +65,15 @@ final class FakeEngine: DockerEngine, @unchecked Sendable {
         try record("removeVolume:\(name)")
         lock.withLock { _volumes.removeAll { $0.name == name } }
     }
-    func isTTY(containerID: String) async throws -> Bool { false }
-    func logs(containerID: String, tail: Int, tty: Bool) -> AsyncThrowingStream<LogLine, Error> { AsyncThrowingStream { $0.finish() } }
+    func isTTY(containerID: String) async throws -> Bool { try record("isTTY:\(containerID)"); return ttyContainerIDs.contains(containerID) }
+    func logs(containerID: String, tail: Int, tty: Bool) -> AsyncThrowingStream<LogLine, Error> {
+        lock.withLock { _calls.append("logs:\(containerID):tail=\(tail):tty=\(tty)") }
+        let lines = logLines
+        return AsyncThrowingStream { c in
+            for l in lines { c.yield(l) }
+            c.finish()
+        }
+    }
 
     func events() -> AsyncThrowingStream<DockerEvent, Error> {
         AsyncThrowingStream { c in lock.withLock { eventContinuation = c } }

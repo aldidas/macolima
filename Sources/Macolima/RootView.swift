@@ -17,32 +17,44 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     }
 }
 
+/// Classic three panes: sidebar, list, detail.
 struct RootView: View {
     @Environment(AppModel.self) private var model
-    @State private var selection: SidebarItem? = .containers
+    @State private var section: SidebarItem? = .containers
+    @State private var containerID: String?
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(selection: $selection)
+            SidebarView(selection: $section)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 300)
-        } detail: {
+        } content: {
             VStack(spacing: 0) {
                 StaleBanner()
-                content
+                list
             }
+            .navigationSplitViewColumnWidth(min: 300, ideal: 380, max: 560)
+        } detail: {
+            detail
         }
-        .frame(minWidth: 900, minHeight: 560)
+        .frame(minWidth: 960, minHeight: 560)
     }
 
-    @ViewBuilder private var content: some View {
+    @ViewBuilder private var list: some View {
         if !model.isBootstrapped {
             ProgressView().controlSize(.large).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            switch selection ?? .containers {
-            case .containers: ContentUnavailableView("Containers", systemImage: SidebarItem.containers.symbol)
+            switch section ?? .containers {
+            case .containers: ContainersView(selection: $containerID)
             case .images: ContentUnavailableView("Images", systemImage: SidebarItem.images.symbol)
             case .volumes: ContentUnavailableView("Volumes", systemImage: SidebarItem.volumes.symbol)
             }
+        }
+    }
+
+    @ViewBuilder private var detail: some View {
+        switch section ?? .containers {
+        case .containers: ContainerDetailView(containerID: containerID)
+        case .images, .volumes: Color.clear
         }
     }
 }

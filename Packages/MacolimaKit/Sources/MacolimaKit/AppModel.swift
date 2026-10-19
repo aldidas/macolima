@@ -145,6 +145,12 @@ public final class AppModel {
         if case .running(let info) = colima { hostDisk = colimaService?.hostDisk(maxBytes: info.diskMaxBytes) }
     }
 
+    /// Pull fresh state after a mutation (events would do it too, but a debounced event is not a guarantee).
+    func refreshAfterMutation() async {
+        guard canMutate else { return }   // a refused action must not talk to the engine or flip the state
+        do { try await refresh() } catch { enterOffline(error) }
+    }
+
     private func enterOffline(_ error: Error) {
         stopEvents()
         let snapshot = loadSnapshot()
