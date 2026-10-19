@@ -51,14 +51,12 @@ public final class DockerAPI: DockerEngine, @unchecked Sendable {
         struct Version: Decodable { let ApiVersion: String }
         let res = try await transport.send(HTTPRequest(method: "GET", path: "/version"))
         let v = try decode(Version.self, from: res.body)
-        lock.lock(); apiVersion = v.ApiVersion; lock.unlock()
+        lock.withLock { apiVersion = v.ApiVersion }
     }
 
     private func versioned(_ path: String) async throws -> String {
-        lock.lock(); let known = apiVersion; lock.unlock()
-        if known == nil { try await negotiate() }
-        lock.lock(); defer { lock.unlock() }
-        return "/v\(apiVersion ?? "")\(path)"
+        if lock.withLock({ apiVersion }) == nil { try await negotiate() }
+        return "/v\(lock.withLock { apiVersion } ?? "")\(path)"
     }
 
     private func get<T: Decodable>(_ type: T.Type, _ path: String, query: [String: String] = [:]) async throws -> T {
@@ -137,9 +135,8 @@ public final class DockerAPI: DockerEngine, @unchecked Sendable {
     /// Known volume sizes from `/system/df` (-1 = not computed, left out). Cached briefly so a burst
     /// of events does not hammer the slow endpoint.
     private func volumeSizes() async throws -> [String: Int64] {
-        lock.lock()
-        if let c = dfCache, now().timeIntervalSince(c.at) < Self.dfTTL { lock.unlock(); return c.sizes }
-        lock.unlock()
+        let fresh = lock.withLock { dfCache.flatMap { now().timeIntervalSince($0.at) < Self.dfTTL ? $0.sizes : nil } }
+        if let fresh { return fresh }
         struct DF: Decodable {
             struct V: Decodable { struct U: Decodable { let Size: Int64 }; let Name: String; let UsageData: U? }
             let Volumes: [V]?
@@ -149,7 +146,7 @@ public final class DockerAPI: DockerEngine, @unchecked Sendable {
         for v in df.Volumes ?? [] {
             if let s = v.UsageData?.Size, s >= 0 { sizes[v.Name] = s }
         }
-        lock.lock(); dfCache = (now(), sizes); lock.unlock()
+        lock.withLock { dfCache = (now(), sizes) }
         return sizes
     }
 

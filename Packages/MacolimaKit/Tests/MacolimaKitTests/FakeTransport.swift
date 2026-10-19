@@ -20,12 +20,12 @@ final class FakeTransport: HTTPTransport, @unchecked Sendable {
     var requests: [HTTPRequest] { lock.lock(); defer { lock.unlock() }; return _requests }
 
     func send(_ request: HTTPRequest) async throws -> HTTPResponse {
-        lock.lock(); _requests.append(request); lock.unlock()
+        lock.withLock { _requests.append(request) }
         return try handler(request)
     }
 
     func stream(_ request: HTTPRequest) -> AsyncThrowingStream<Data, Error> {
-        lock.lock(); _requests.append(request); lock.unlock()
+        lock.withLock { _requests.append(request) }
         let chunks = streamChunks
         return AsyncThrowingStream { c in
             for chunk in chunks { c.yield(chunk) }
