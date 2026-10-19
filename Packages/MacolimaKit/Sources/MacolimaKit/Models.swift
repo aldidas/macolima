@@ -81,3 +81,18 @@ public struct VolumeSummary: Codable, Sendable, Hashable, Identifiable {
 
     public var id: String { name }
 }
+
+/// Last-known state of everything the app lists, kept on disk for when Docker is unreachable.
+public struct Snapshot: Codable, Sendable, Equatable {
+    public let savedAt: Date
+    public let containers: [ContainerSummary]
+    public let images: [ImageSummary]
+    public let volumes: [VolumeSummary]
+
+    public init(savedAt: Date, containers: [ContainerSummary], images: [ImageSummary], volumes: [VolumeSummary]) {
+        self.savedAt = savedAt
+        self.containers = containers
+        self.images = images
+        self.volumes = volumes
+    }
+}
