@@ -63,13 +63,17 @@ public final class DockerAPI: DockerEngine, @unchecked Sendable {
         return "/v\(lock.withLock { apiVersion } ?? "")\(path)"
     }
 
-    private func get<T: Decodable>(_ type: T.Type, _ path: String, query: [String: String] = [:]) async throws -> T {
-        let res = try await transport.send(HTTPRequest(method: "GET", path: try await versioned(path), query: query))
+    /// Waits that legitimately take long: stopping a container (grace period), `/system/df` on big hosts.
+    private static let slowTimeout: TimeInterval = 120
+
+    private func get<T: Decodable>(_ type: T.Type, _ path: String, query: [String: String] = [:],
+                                   timeout: TimeInterval? = nil) async throws -> T {
+        let res = try await transport.send(HTTPRequest(method: "GET", path: try await versioned(path), query: query, timeout: timeout))
         return try decode(type, from: res.body)
     }
 
     private func call(_ method: String, _ path: String, query: [String: String] = [:]) async throws {
-        _ = try await transport.send(HTTPRequest(method: method, path: try await versioned(path), query: query))
+        _ = try await transport.send(HTTPRequest(method: method, path: try await versioned(path), query: query, timeout: Self.slowTimeout))
     }
 
     private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
@@ -154,7 +158,7 @@ public final class DockerAPI: DockerEngine, @unchecked Sendable {
             let Containers: [C]?
             let BuildCache: [B]?
         }
-        let df = try await get(DF.self, "/system/df")
+        let df = try await get(DF.self, "/system/df", timeout: Self.slowTimeout)
         var sizes: [String: Int64] = [:]
         for v in df.Volumes ?? [] {
             if let s = v.UsageData?.Size, s >= 0 { sizes[v.Name] = s }

@@ -6,12 +6,15 @@ public struct HTTPRequest: Sendable {
     public let path: String
     public let query: [String: String]
     public let body: Data?
+    /// Seconds to wait for the engine to answer; `nil` = the transport's default. Ignored for streams.
+    public let timeout: TimeInterval?
 
-    public init(method: String, path: String, query: [String: String] = [:], body: Data? = nil) {
+    public init(method: String, path: String, query: [String: String] = [:], body: Data? = nil, timeout: TimeInterval? = nil) {
         self.method = method
         self.path = path
         self.query = query
         self.body = body
+        self.timeout = timeout
     }
 }
 
@@ -25,6 +28,8 @@ public struct HTTPResponse: Sendable {
 public enum DockerError: Error, Equatable {
     case socketMissing
     case connectionRefused
+    /// The engine accepted the connection but did not answer in time (a wedged daemon or VM).
+    case timedOut
     case http(status: Int, message: String)
     case decoding(String)
 }
@@ -38,8 +43,12 @@ public protocol HTTPTransport: Sendable {
 /// HTTP/1.1 over a unix domain socket, one connection per request (`Connection: close`).
 public struct UnixHTTPClient: HTTPTransport {
     let socketPath: String
+    let timeout: TimeInterval
 
-    public init(socketPath: String) { self.socketPath = socketPath }
+    public init(socketPath: String, timeout: TimeInterval = 30) {
+        self.socketPath = socketPath
+        self.timeout = timeout
+    }
 
     public func send(_ request: HTTPRequest) async throws -> HTTPResponse {
         try await withCheckedThrowingContinuation { cont in
@@ -80,6 +89,8 @@ public struct UnixHTTPClient: HTTPTransport {
         let fd = try connect()
         box?.set(fd)
         defer { box?.clear(); Darwin.close(fd) }
+        // Streams (events, logs) are idle for long stretches by design; one-shot requests must not hang forever.
+        if box == nil { Self.setTimeout(fd, request.timeout ?? timeout) }
 
         try writeAll(fd, Self.serialize(request))
 
@@ -100,6 +111,7 @@ public struct UnixHTTPClient: HTTPTransport {
             if n < 0 {
                 if errno == EINTR { continue }
                 if box?.isShutdown == true { break }
+                if errno == EAGAIN || errno == EWOULDBLOCK { throw DockerError.timedOut }
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
             if n == 0 { break }
@@ -147,6 +159,12 @@ public struct UnixHTTPClient: HTTPTransport {
         return fd
     }
 
+    private static func setTimeout(_ fd: Int32, _ seconds: TimeInterval) {
+        var tv = timeval(tv_sec: Int(seconds), tv_usec: Int32((seconds - seconds.rounded(.down)) * 1_000_000))
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+    }
+
     private func writeAll(_ fd: Int32, _ data: Data) throws {
         try data.withUnsafeBytes { raw in
             var offset = 0
@@ -154,6 +172,7 @@ public struct UnixHTTPClient: HTTPTransport {
                 let n = Darwin.write(fd, raw.baseAddress! + offset, raw.count - offset)
                 if n < 0 {
                     if errno == EINTR { continue }
+                    if errno == EAGAIN || errno == EWOULDBLOCK { throw DockerError.timedOut }
                     throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
                 }
                 offset += n

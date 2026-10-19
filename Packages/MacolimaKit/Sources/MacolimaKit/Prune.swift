@@ -68,6 +68,7 @@ public enum Pruner {
         case .http(_, let message): return message
         case .socketMissing: return "Docker socket not found"
         case .connectionRefused: return "Docker is not responding"
+        case .timedOut: return "Docker did not answer in time. The Colima VM may be stuck; try restarting Colima."
         case .decoding(let detail): return detail
         case nil: return error.localizedDescription
         }

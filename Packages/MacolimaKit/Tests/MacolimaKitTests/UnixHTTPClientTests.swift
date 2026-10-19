@@ -78,4 +78,31 @@ final class UnixHTTPClientTests: XCTestCase {
             XCTAssertEqual(error as? DockerError, .http(status: 404, message: "No such container"))
         }
     }
+
+    /// Review finding: a wedged daemon that accepts but never answers must not hang the caller forever.
+    func test_send_serverNeverReplies_throwsTimedOut() async throws {
+        let server = try FakeUnixServer(script: [.waitForSignal])
+        let client = UnixHTTPClient(socketPath: server.path, timeout: 0.3)
+        let started = Date()
+        do {
+            _ = try await client.send(HTTPRequest(method: "GET", path: "/x"))
+            XCTFail("expected throw")
+        } catch {
+            XCTAssertEqual(error as? DockerError, .timedOut)
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(started), 3)
+        server.signal()
+    }
+
+    func test_send_perRequestTimeoutOverridesDefault() async throws {
+        let server = try FakeUnixServer(script: [.waitForSignal])
+        let client = UnixHTTPClient(socketPath: server.path, timeout: 60)
+        do {
+            _ = try await client.send(HTTPRequest(method: "GET", path: "/x", timeout: 0.3))
+            XCTFail("expected throw")
+        } catch {
+            XCTAssertEqual(error as? DockerError, .timedOut)
+        }
+        server.signal()
+    }
 }

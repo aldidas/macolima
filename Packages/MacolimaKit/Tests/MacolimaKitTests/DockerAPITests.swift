@@ -154,4 +154,15 @@ final class DockerAPITests: XCTestCase {
         _ = try await api.diskUsage()
         XCTAssertEqual(t.requests.filter { $0.path.hasSuffix("/system/df") }.count, 1)
     }
+
+    func test_slowCalls_getALongerTimeoutThanReads() async throws {
+        let t = FakeTransport.standard()
+        let api = DockerAPI(transport: t)
+        try await api.stop("c1")
+        XCTAssertEqual(t.requests.last?.timeout, 120, "stop waits for the container's grace period")
+        _ = try await api.volumes()
+        XCTAssertEqual(t.requests.last { $0.path.hasSuffix("/system/df") }?.timeout, 120, "/system/df is slow on big hosts")
+        _ = try await api.containers()
+        XCTAssertNil(t.requests.last?.timeout, "plain reads use the transport default")
+    }
 }
