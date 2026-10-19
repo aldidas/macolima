@@ -1,0 +1,61 @@
+[
+ {
+  "Id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Names": [
+   "/first-name",
+   "/second-name"
+  ],
+  "Image": "alpine:latest",
+  "ImageID": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "Command": "sleep 1d",
+  "Created": 1760000000,
+  "Ports": [
+   {
+    "IP": "0.0.0.0",
+    "PrivatePort": 80,
+    "PublicPort": 8080,
+    "Type": "tcp"
+   },
+   {
+    "PrivatePort": 9000,
+    "Type": "tcp"
+   }
+  ],
+  "Labels": {
+   "com.docker.compose.project": "shop",
+   "com.docker.compose.service": "web"
+  },
+  "State": "running",
+  "Status": "Up 2 hours",
+  "Mounts": [
+   {
+    "Type": "volume",
+    "Name": "shop_pgdata",
+    "Source": "/var/lib/docker/volumes/shop_pgdata/_data",
+    "Destination": "/data"
+   },
+   {
+    "Type": "bind",
+    "Source": "/Users/x/code",
+    "Destination": "/code"
+   },
+   {
+    "Type": "tmpfs",
+    "Destination": "/tmp"
+   }
+  ]
+ },
+ {
+  "Id": "0123456789abcdef000000000000000000000000000000000000000000000000",
+  "Names": [],
+  "Image": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "ImageID": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "Command": "/bin/true",
+  "Created": 1760000100,
+  "Ports": [],
+  "Labels": {},
+  "State": "exited",
+  "Status": "Exited (0) 3 days ago",
+  "Mounts": []
+ }
+]
